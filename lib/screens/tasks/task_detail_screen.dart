@@ -2,7 +2,6 @@
 import 'package:flutter/material.dart';
 import 'package:zenflow/main.dart';
 
-// The main widget class that extends StatefulWidget
 class TaskDetailScreen extends StatefulWidget {
   final Map<String, dynamic> task;
 
@@ -12,11 +11,10 @@ class TaskDetailScreen extends StatefulWidget {
   }) : super(key: key);
 
   @override
-  TaskDetailScreenState createState() => TaskDetailScreenState();
+  _TaskDetailScreenState createState() => _TaskDetailScreenState();
 }
 
-// The state class that manages the widget's state
-class TaskDetailScreenState extends State<TaskDetailScreen> {
+class _TaskDetailScreenState extends State<TaskDetailScreen> {
   late double _progress;
   late List<Map<String, dynamic>> _subtasks;
   late TextEditingController _noteController;
@@ -59,7 +57,23 @@ class TaskDetailScreenState extends State<TaskDetailScreen> {
     
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Task Details'),
+        automaticallyImplyLeading: true, // This ensures the back button appears
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios), // Using iOS-style back arrow for cleaner look
+          color: Colors.white, // Ensuring the back button is visible
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        backgroundColor: ZenFlowColors.primaryDarkTeal, // Using our app's primary color
+        elevation: 0, // Removing shadow for a cleaner look
+        title: const Text(
+          'Task Details',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 22,
+            fontFamily: 'AdventPro',
+            fontWeight: FontWeight.w600,
+          ),
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.edit_outlined),

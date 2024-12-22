@@ -3,8 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:zenflow/main.dart';
 import '../auth/login_screen.dart';
+import '../tasks/task_detail_screen.dart';
 
-// Let's create an enum to manage our navigation state
+// Navigation state management using enum for type safety
 enum NavigationItem {
   home,
   calendar,
@@ -23,25 +24,31 @@ class _HomeScreenState extends State<HomeScreen> {
   String _username = '';
   NavigationItem _selectedItem = NavigationItem.home;
   
-  // Sample task data - in a real app this would come from your task management system
+  // Sample task data structure with more detailed information
   final List<Map<String, dynamic>> _todaysTasks = [
     {
       'title': 'Project Planning',
       'deadline': '2:00 PM',
       'priority': 'High',
       'progress': 0.7,
+      'description': 'Create project roadmap and milestone definitions',
+      'notes': 'Include feedback from last week\'s team meeting',
     },
     {
       'title': 'Team Meeting',
       'deadline': '3:30 PM',
       'priority': 'Medium',
       'progress': 0.0,
+      'description': 'Weekly sync with development team',
+      'notes': 'Focus on sprint planning and blockers',
     },
     {
       'title': 'Document Review',
       'deadline': '5:00 PM',
       'priority': 'Low',
       'progress': 0.3,
+      'description': 'Review and annotate technical specifications',
+      'notes': 'Pay special attention to API documentation',
     },
   ];
 
@@ -58,31 +65,26 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
+  // Helper method to format the greeting based on time of day
+  String _getGreeting() {
+    final hour = DateTime.now().hour;
+    if (hour < 12) {
+      return 'Good morning';
+    } else if (hour < 17) {
+      return 'Good afternoon';
+    } else {
+      return 'Good evening';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final textTheme = theme.textTheme;
 
     return Scaffold(
-      backgroundColor: theme.colorScheme.background, // Using our light blue background
-      appBar: AppBar(
-        elevation: 0,
-        title: const Text('ZenFlow'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications_outlined),
-            onPressed: () {
-              // TODO: Implement notifications
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.settings_outlined),
-            onPressed: () {
-              // TODO: Navigate to settings
-            },
-          ),
-        ],
-      ),
+      backgroundColor: theme.colorScheme.background,
+      appBar: _buildAppBar(theme),
       body: SafeArea(
         child: SingleChildScrollView(
           child: Padding(
@@ -90,95 +92,11 @@ class _HomeScreenState extends State<HomeScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Welcome Section with updated styling
-                Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.primary.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Welcome back,',
-                              style: textTheme.bodyLarge?.copyWith(
-                                color: theme.colorScheme.primary,
-                              ),
-                            ),
-                            Text(
-                              _username,
-                              style: textTheme.headlineMedium?.copyWith(
-                                color: theme.colorScheme.primary,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      CircleAvatar(
-                        radius: 24,
-                        backgroundColor: theme.colorScheme.secondary,
-                        child: Text(
-                          _username.isNotEmpty ? _username[0].toUpperCase() : 'U',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+                _buildWelcomeSection(theme, textTheme),
                 const SizedBox(height: 32),
-
-                // Progress Overview Section
-                Text(
-                  'Today\'s Progress',
-                  style: textTheme.titleLarge?.copyWith(
-                    color: theme.colorScheme.primary,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                _buildProgressOverviewCard(theme),
+                _buildProgressSection(theme, textTheme),
                 const SizedBox(height: 32),
-
-                // Tasks Section
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'Current Tasks',
-                      style: textTheme.titleLarge?.copyWith(
-                        color: theme.colorScheme.primary,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    TextButton(
-                      onPressed: () {
-                        // TODO: Navigate to all tasks
-                      },
-                      child: Text(
-                        'See All',
-                        style: textTheme.bodyLarge?.copyWith(
-                          color: theme.colorScheme.secondary,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                ListView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: _todaysTasks.length,
-                  itemBuilder: (context, index) => _buildTaskCard(_todaysTasks[index], theme),
-                ),
+                _buildTasksSection(theme, textTheme),
               ],
             ),
           ),
@@ -186,16 +104,106 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       bottomNavigationBar: _buildBottomNavBar(theme),
       floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          // TODO: Implement new task creation
-        },
+        onPressed: () => _showAddTaskDialog(context),
         backgroundColor: theme.colorScheme.secondary,
         child: const Icon(Icons.add, color: Colors.white),
       ),
     );
   }
 
-  Widget _buildProgressOverviewCard(ThemeData theme) {
+  // Build the app bar with notification and settings buttons
+  PreferredSizeWidget _buildAppBar(ThemeData theme) {
+    return AppBar(
+      elevation: 0,
+      title: const Text('ZenFlow'),
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.notifications_outlined),
+          onPressed: () {
+            // TODO: Implement notifications panel
+          },
+        ),
+        IconButton(
+          icon: const Icon(Icons.settings_outlined),
+          onPressed: () {
+            // TODO: Navigate to settings screen
+          },
+        ),
+      ],
+    );
+  }
+
+  // Build the welcome section with user greeting and avatar
+  Widget _buildWelcomeSection(ThemeData theme, TextTheme textTheme) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.primary.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _getGreeting(),
+                  style: textTheme.bodyLarge?.copyWith(
+                    color: theme.colorScheme.primary,
+                  ),
+                ),
+                Text(
+                  _username,
+                  style: textTheme.headlineMedium?.copyWith(
+                    color: theme.colorScheme.primary,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          _buildUserAvatar(theme),
+        ],
+      ),
+    );
+  }
+
+  // Build the user avatar with first letter of username
+  Widget _buildUserAvatar(ThemeData theme) {
+    return CircleAvatar(
+      radius: 24,
+      backgroundColor: theme.colorScheme.secondary,
+      child: Text(
+        _username.isNotEmpty ? _username[0].toUpperCase() : 'U',
+        style: const TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    );
+  }
+
+  // Build the progress overview section
+  Widget _buildProgressSection(ThemeData theme, TextTheme textTheme) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Today\'s Progress',
+          style: textTheme.titleLarge?.copyWith(
+            color: theme.colorScheme.primary,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 16),
+        _buildProgressCard(theme),
+      ],
+    );
+  }
+
+  // Build the progress metrics card
+  Widget _buildProgressCard(ThemeData theme) {
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -206,11 +214,11 @@ class _HomeScreenState extends State<HomeScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                _buildStatistic('Tasks\nCompleted', '12', theme),
+                _buildProgressMetric('Tasks\nCompleted', '12', theme),
                 _buildVerticalDivider(theme),
-                _buildStatistic('Focus\nTime', '2.5h', theme),
+                _buildProgressMetric('Focus\nTime', '2.5h', theme),
                 _buildVerticalDivider(theme),
-                _buildStatistic('Progress\nRate', '85%', theme),
+                _buildProgressMetric('Progress\nRate', '85%', theme),
               ],
             ),
             const SizedBox(height: 20),
@@ -227,6 +235,69 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  // Build individual progress metric
+  Widget _buildProgressMetric(String label, String value, ThemeData theme) {
+    return Column(
+      children: [
+        Text(
+          value,
+          style: theme.textTheme.headlineMedium?.copyWith(
+            color: theme.colorScheme.secondary,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          label,
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: theme.colorScheme.primary,
+          ),
+          textAlign: TextAlign.center,
+        ),
+      ],
+    );
+  }
+
+  // Build the tasks section with header and list
+  Widget _buildTasksSection(ThemeData theme, TextTheme textTheme) {
+    return Column(
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Current Tasks',
+              style: textTheme.titleLarge?.copyWith(
+                color: theme.colorScheme.primary,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            TextButton(
+              onPressed: () {
+                // TODO: Navigate to all tasks screen
+              },
+              child: Text(
+                'See All',
+                style: textTheme.bodyLarge?.copyWith(
+                  color: theme.colorScheme.secondary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        ListView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: _todaysTasks.length,
+          itemBuilder: (context, index) => _buildTaskCard(_todaysTasks[index], theme),
+        ),
+      ],
+    );
+  }
+
+  // Build individual task card with navigation to detail screen
   Widget _buildTaskCard(Map<String, dynamic> task, ThemeData theme) {
     final priorityColors = {
       'High': theme.colorScheme.error,
@@ -239,7 +310,12 @@ class _HomeScreenState extends State<HomeScreen> {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: InkWell(
         onTap: () {
-          // TODO: Navigate to task details
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => TaskDetailScreen(task: task),
+            ),
+          );
         },
         borderRadius: BorderRadius.circular(12),
         child: Padding(
@@ -293,6 +369,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  // Build bottom navigation bar
   Widget _buildBottomNavBar(ThemeData theme) {
     return Container(
       decoration: BoxDecoration(
@@ -337,39 +414,35 @@ class _HomeScreenState extends State<HomeScreen> {
           setState(() {
             _selectedItem = NavigationItem.values[index];
           });
-          // TODO: Implement navigation to different screens
         },
       ),
     );
   }
 
-  Widget _buildStatistic(String label, String value, ThemeData theme) {
-    return Column(
-      children: [
-        Text(
-          value,
-          style: theme.textTheme.headlineMedium?.copyWith(
-            color: theme.colorScheme.secondary,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: theme.colorScheme.primary,
-          ),
-          textAlign: TextAlign.center,
-        ),
-      ],
-    );
-  }
-
+  // Build vertical divider for progress metrics
   Widget _buildVerticalDivider(ThemeData theme) {
     return Container(
       height: 40,
       width: 1,
       color: theme.colorScheme.primary.withOpacity(0.1),
+    );
+  }
+
+  // Show dialog for adding new task
+  void _showAddTaskDialog(BuildContext context) {
+    // TODO: Implement add task dialog
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Add New Task'),
+        content: Text('Task creation dialog will be implemented here'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Close'),
+          ),
+        ],
+      ),
     );
   }
 }
