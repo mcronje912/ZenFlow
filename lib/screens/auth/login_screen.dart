@@ -1,7 +1,7 @@
 // lib/screens/auth/login_screen.dart
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';import 'login_screen.dart';
-import '../../../home/home_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../home/home_screen.dart';
 import 'signup_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -16,7 +16,25 @@ class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _isLoading = false;
+  bool _rememberMe = false;
   String _errorMessage = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSavedCredentials();
+  }
+
+  Future<void> _loadSavedCredentials() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _rememberMe = prefs.getBool('remember_me') ?? false;
+      if (_rememberMe) {
+        _emailController.text = prefs.getString('saved_email') ?? '';
+        _passwordController.text = prefs.getString('saved_password') ?? '';
+      }
+    });
+  }
 
   Future<void> _handleLogin() async {
     if (_formKey.currentState!.validate()) {
@@ -26,16 +44,25 @@ class _LoginScreenState extends State<LoginScreen> {
       });
 
       try {
-        // Simulate network delay
-        await Future.delayed(const Duration(seconds: 1));
-        
         final prefs = await SharedPreferences.getInstance();
+        
+        // Handle "Remember Me" functionality
+        if (_rememberMe) {
+          await prefs.setString('saved_email', _emailController.text);
+          await prefs.setString('saved_password', _passwordController.text);
+          await prefs.setBool('remember_me', true);
+        } else {
+          await prefs.remove('saved_email');
+          await prefs.remove('saved_password');
+          await prefs.setBool('remember_me', false);
+        }
+
+        // Verify credentials
         final storedEmail = prefs.getString('user_email');
         final storedPassword = prefs.getString('user_password');
 
         if (storedEmail == _emailController.text && 
             storedPassword == _passwordController.text) {
-          // Login successful
           await prefs.setBool('isLoggedIn', true);
           if (!mounted) return;
           Navigator.pushReplacement(
@@ -61,9 +88,11 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+
     return Scaffold(
       body: SafeArea(
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(24.0),
           child: Form(
             key: _formKey,
@@ -71,12 +100,16 @@ class _LoginScreenState extends State<LoginScreen> {
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Text(
+                const SizedBox(height: 48),
+                Text(
                   'Welcome Back',
-                  style: TextStyle(
-                    fontSize: 32,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: textTheme.displayLarge,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Sign in to continue',
+                  style: textTheme.bodyLarge?.copyWith(color: Colors.grey[600]),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 48),
@@ -84,7 +117,6 @@ class _LoginScreenState extends State<LoginScreen> {
                   controller: _emailController,
                   decoration: const InputDecoration(
                     labelText: 'Email',
-                    border: OutlineInputBorder(),
                     prefixIcon: Icon(Icons.email),
                   ),
                   keyboardType: TextInputType.emailAddress,
@@ -103,7 +135,6 @@ class _LoginScreenState extends State<LoginScreen> {
                   controller: _passwordController,
                   decoration: const InputDecoration(
                     labelText: 'Password',
-                    border: OutlineInputBorder(),
                     prefixIcon: Icon(Icons.lock),
                   ),
                   obscureText: true,
@@ -117,23 +148,44 @@ class _LoginScreenState extends State<LoginScreen> {
                     return null;
                   },
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Checkbox(
+                      value: _rememberMe,
+                      onChanged: (value) {
+                        setState(() {
+                          _rememberMe = value ?? false;
+                        });
+                      },
+                    ),
+                    Text(
+                      'Remember Me',
+                      style: textTheme.bodyLarge,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
                 if (_errorMessage.isNotEmpty)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 16),
                     child: Text(
                       _errorMessage,
-                      style: const TextStyle(color: Colors.red),
+                      style: textTheme.bodyLarge?.copyWith(color: Colors.red),
                       textAlign: TextAlign.center,
                     ),
                   ),
                 ElevatedButton(
                   onPressed: _isLoading ? null : _handleLogin,
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                  ),
                   child: _isLoading
-                      ? const CircularProgressIndicator()
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
                       : const Text('Login'),
                 ),
                 const SizedBox(height: 16),
@@ -144,7 +196,10 @@ class _LoginScreenState extends State<LoginScreen> {
                       MaterialPageRoute(builder: (context) => const SignupScreen()),
                     );
                   },
-                  child: const Text("Don't have an account? Sign Up"),
+                  child: Text(
+                    "Don't have an account? Sign Up",
+                    style: textTheme.bodyLarge?.copyWith(color: Colors.blue),
+                  ),
                 ),
               ],
             ),

@@ -1,6 +1,5 @@
 // lib/screens/auth/signup_screen.dart
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';import 'login_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'login_screen.dart';
 
@@ -27,8 +26,7 @@ class _SignupScreenState extends State<SignupScreen> {
       });
 
       try {
-        // Simulate network delay
-        await Future.delayed(const Duration(seconds: 1));
+        await Future.delayed(const Duration(seconds: 1)); // Simulate network delay
         
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('username', _usernameController.text);
@@ -54,6 +52,8 @@ class _SignupScreenState extends State<SignupScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+
     return Scaffold(
       body: SafeArea(
         child: SingleChildScrollView(
@@ -65,12 +65,15 @@ class _SignupScreenState extends State<SignupScreen> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 const SizedBox(height: 48),
-                const Text(
+                Text(
                   'Create Account',
-                  style: TextStyle(
-                    fontSize: 32,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: textTheme.displayLarge,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Sign up to get started',
+                  style: textTheme.bodyLarge?.copyWith(color: Colors.grey[600]),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 48),
@@ -78,7 +81,6 @@ class _SignupScreenState extends State<SignupScreen> {
                   controller: _usernameController,
                   decoration: const InputDecoration(
                     labelText: 'Username',
-                    border: OutlineInputBorder(),
                     prefixIcon: Icon(Icons.person),
                   ),
                   validator: (value) {
@@ -93,7 +95,6 @@ class _SignupScreenState extends State<SignupScreen> {
                   controller: _emailController,
                   decoration: const InputDecoration(
                     labelText: 'Email',
-                    border: OutlineInputBorder(),
                     prefixIcon: Icon(Icons.email),
                   ),
                   keyboardType: TextInputType.emailAddress,
@@ -112,9 +113,9 @@ class _SignupScreenState extends State<SignupScreen> {
                   controller: _passwordController,
                   decoration: const InputDecoration(
                     labelText: 'Password',
-                    border: OutlineInputBorder(),
                     prefixIcon: Icon(Icons.lock),
                   ),
+                  // Continuing from the TextFormField for password...
                   obscureText: true,
                   validator: (value) {
                     if (value == null || value.isEmpty) {
@@ -132,17 +133,21 @@ class _SignupScreenState extends State<SignupScreen> {
                     padding: const EdgeInsets.only(bottom: 16),
                     child: Text(
                       _errorMessage,
-                      style: const TextStyle(color: Colors.red),
+                      style: textTheme.bodyLarge?.copyWith(color: Colors.red),
                       textAlign: TextAlign.center,
                     ),
                   ),
                 ElevatedButton(
                   onPressed: _isLoading ? null : _handleSignup,
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                  ),
                   child: _isLoading
-                      ? const CircularProgressIndicator()
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
                       : const Text('Sign Up'),
                 ),
                 const SizedBox(height: 16),
@@ -153,7 +158,10 @@ class _SignupScreenState extends State<SignupScreen> {
                       MaterialPageRoute(builder: (context) => const LoginScreen()),
                     );
                   },
-                  child: const Text('Already have an account? Login'),
+                  child: Text(
+                    'Already have an account? Login',
+                    style: textTheme.bodyLarge?.copyWith(color: Colors.blue),
+                  ),
                 ),
               ],
             ),

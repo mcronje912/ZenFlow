@@ -19,3 +19,8 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  
+  fonts:
+    - family: AdventPro
+      fonts:
+        - asset: assets/fonts/AdventPro-VariableFont_wdth,wght.ttf
