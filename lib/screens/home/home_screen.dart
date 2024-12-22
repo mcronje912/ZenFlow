@@ -1,7 +1,16 @@
 // lib/screens/home/home_screen.dart
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:zenflow/main.dart';
 import '../auth/login_screen.dart';
+
+// Let's create an enum to manage our navigation state
+enum NavigationItem {
+  home,
+  calendar,
+  analytics,
+  profile,
+}
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -12,6 +21,29 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   String _username = '';
+  NavigationItem _selectedItem = NavigationItem.home;
+  
+  // Sample task data - in a real app this would come from your task management system
+  final List<Map<String, dynamic>> _todaysTasks = [
+    {
+      'title': 'Project Planning',
+      'deadline': '2:00 PM',
+      'priority': 'High',
+      'progress': 0.7,
+    },
+    {
+      'title': 'Team Meeting',
+      'deadline': '3:30 PM',
+      'priority': 'Medium',
+      'progress': 0.0,
+    },
+    {
+      'title': 'Document Review',
+      'deadline': '5:00 PM',
+      'priority': 'Low',
+      'progress': 0.3,
+    },
+  ];
 
   @override
   void initState() {
@@ -19,7 +51,6 @@ class _HomeScreenState extends State<HomeScreen> {
     _loadUserData();
   }
 
-  // Load the username when the screen initializes
   Future<void> _loadUserData() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
@@ -27,116 +58,234 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  // Handle the logout process with confirmation
-  Future<void> _handleLogout() async {
-    final shouldLogout = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(
-          'Confirm Logout',
-          style: Theme.of(context).textTheme.titleLarge,
-        ),
-        content: Text(
-          'Are you sure you want to logout?',
-          style: Theme.of(context).textTheme.bodyLarge,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: Text(
-              'Logout',
-              style: TextStyle(color: Colors.red[700]),
-            ),
-          ),
-        ],
-      ),
-    );
-
-    if (shouldLogout == true) {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool('isLoggedIn', false);
-      
-      if (!mounted) return;
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (context) => const LoginScreen()),
-        (route) => false,
-      );
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
+    final theme = Theme.of(context);
+    final textTheme = theme.textTheme;
 
     return Scaffold(
+      backgroundColor: theme.colorScheme.background, // Using our light blue background
       appBar: AppBar(
+        elevation: 0,
         title: const Text('ZenFlow'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: _handleLogout,
-            tooltip: 'Logout',
+            icon: const Icon(Icons.notifications_outlined),
+            onPressed: () {
+              // TODO: Implement notifications
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.settings_outlined),
+            onPressed: () {
+              // TODO: Navigate to settings
+            },
           ),
         ],
       ),
       body: SafeArea(
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Welcome Section with updated styling
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primary.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Welcome back,',
+                              style: textTheme.bodyLarge?.copyWith(
+                                color: theme.colorScheme.primary,
+                              ),
+                            ),
+                            Text(
+                              _username,
+                              style: textTheme.headlineMedium?.copyWith(
+                                color: theme.colorScheme.primary,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      CircleAvatar(
+                        radius: 24,
+                        backgroundColor: theme.colorScheme.secondary,
+                        child: Text(
+                          _username.isNotEmpty ? _username[0].toUpperCase() : 'U',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 32),
+
+                // Progress Overview Section
+                Text(
+                  'Today\'s Progress',
+                  style: textTheme.titleLarge?.copyWith(
+                    color: theme.colorScheme.primary,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                _buildProgressOverviewCard(theme),
+                const SizedBox(height: 32),
+
+                // Tasks Section
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Current Tasks',
+                      style: textTheme.titleLarge?.copyWith(
+                        color: theme.colorScheme.primary,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () {
+                        // TODO: Navigate to all tasks
+                      },
+                      child: Text(
+                        'See All',
+                        style: textTheme.bodyLarge?.copyWith(
+                          color: theme.colorScheme.secondary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                ListView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: _todaysTasks.length,
+                  itemBuilder: (context, index) => _buildTaskCard(_todaysTasks[index], theme),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+      bottomNavigationBar: _buildBottomNavBar(theme),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          // TODO: Implement new task creation
+        },
+        backgroundColor: theme.colorScheme.secondary,
+        child: const Icon(Icons.add, color: Colors.white),
+      ),
+    );
+  }
+
+  Widget _buildProgressOverviewCard(ThemeData theme) {
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _buildStatistic('Tasks\nCompleted', '12', theme),
+                _buildVerticalDivider(theme),
+                _buildStatistic('Focus\nTime', '2.5h', theme),
+                _buildVerticalDivider(theme),
+                _buildStatistic('Progress\nRate', '85%', theme),
+              ],
+            ),
+            const SizedBox(height: 20),
+            LinearProgressIndicator(
+              value: 0.85,
+              backgroundColor: theme.colorScheme.primary.withOpacity(0.1),
+              color: theme.colorScheme.secondary,
+              minHeight: 8,
+              borderRadius: BorderRadius.circular(4),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTaskCard(Map<String, dynamic> task, ThemeData theme) {
+    final priorityColors = {
+      'High': theme.colorScheme.error,
+      'Medium': ZenFlowColors.accentCoral,
+      'Low': theme.colorScheme.secondary,
+    };
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: InkWell(
+        onTap: () {
+          // TODO: Navigate to task details
+        },
+        borderRadius: BorderRadius.circular(12),
         child: Padding(
-          padding: const EdgeInsets.all(24.0),
+          padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'Welcome, $_username!',
-                style: textTheme.displayLarge,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Your productivity journey starts here',
-                style: textTheme.bodyLarge?.copyWith(color: Colors.grey[600]),
-              ),
-              const SizedBox(height: 32),
-              // Quick Actions Section
-              Text(
-                'Quick Actions',
-                style: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
-              ),
-              const SizedBox(height: 16),
-              GridView.count(
-                crossAxisCount: 2,
-                shrinkWrap: true,
-                mainAxisSpacing: 16,
-                crossAxisSpacing: 16,
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  _buildQuickActionCard(
-                    context,
-                    'Tasks',
-                    Icons.task_alt,
-                    () {/* TODO: Implement tasks screen */},
+                  Expanded(
+                    child: Text(
+                      task['title'] as String,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        color: theme.colorScheme.primary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   ),
-                  _buildQuickActionCard(
-                    context,
-                    'Calendar',
-                    Icons.calendar_today,
-                    () {/* TODO: Implement calendar screen */},
-                  ),
-                  _buildQuickActionCard(
-                    context,
-                    'Statistics',
-                    Icons.bar_chart,
-                    () {/* TODO: Implement statistics screen */},
-                  ),
-                  _buildQuickActionCard(
-                    context,
-                    'Settings',
-                    Icons.settings,
-                    () {/* TODO: Implement settings screen */},
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: priorityColors[task['priority']]?.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      task['priority'] as String,
+                      style: TextStyle(
+                        color: priorityColors[task['priority']],
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   ),
                 ],
               ),
+              if ((task['progress'] as double) > 0) ...[
+                const SizedBox(height: 8),
+                LinearProgressIndicator(
+                  value: task['progress'] as double,
+                  backgroundColor: theme.colorScheme.primary.withOpacity(0.1),
+                  color: theme.colorScheme.secondary,
+                  minHeight: 4,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ],
             ],
           ),
         ),
@@ -144,43 +293,83 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // Helper method to build quick action cards
-  Widget _buildQuickActionCard(
-    BuildContext context,
-    String title,
-    IconData icon,
-    VoidCallback onTap,
-  ) {
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
+  Widget _buildBottomNavBar(ThemeData theme) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 10,
+            offset: const Offset(0, -5),
+          ),
+        ],
       ),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                icon,
-                size: 32,
-                color: Theme.of(context).primaryColor,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                title,
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-                textAlign: TextAlign.center,
-              ),
-            ],
+      child: BottomNavigationBar(
+        currentIndex: _selectedItem.index,
+        type: BottomNavigationBarType.fixed,
+        backgroundColor: Colors.white,
+        selectedItemColor: theme.colorScheme.primary,
+        unselectedItemColor: Colors.grey,
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.home_outlined),
+            activeIcon: Icon(Icons.home),
+            label: 'Home',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.calendar_today_outlined),
+            activeIcon: Icon(Icons.calendar_today),
+            label: 'Calendar',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.bar_chart_outlined),
+            activeIcon: Icon(Icons.bar_chart),
+            label: 'Analytics',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.person_outline),
+            activeIcon: Icon(Icons.person),
+            label: 'Profile',
+          ),
+        ],
+        onTap: (index) {
+          setState(() {
+            _selectedItem = NavigationItem.values[index];
+          });
+          // TODO: Implement navigation to different screens
+        },
+      ),
+    );
+  }
+
+  Widget _buildStatistic(String label, String value, ThemeData theme) {
+    return Column(
+      children: [
+        Text(
+          value,
+          style: theme.textTheme.headlineMedium?.copyWith(
+            color: theme.colorScheme.secondary,
+            fontWeight: FontWeight.bold,
           ),
         ),
-      ),
+        const SizedBox(height: 4),
+        Text(
+          label,
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: theme.colorScheme.primary,
+          ),
+          textAlign: TextAlign.center,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildVerticalDivider(ThemeData theme) {
+    return Container(
+      height: 40,
+      width: 1,
+      color: theme.colorScheme.primary.withOpacity(0.1),
     );
   }
 }
