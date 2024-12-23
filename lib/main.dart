@@ -30,6 +30,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'ZenFlow',
+      debugShowCheckedModeBanner: false,
       theme: ThemeData(
         // Use our custom color scheme
         colorScheme: ColorScheme(

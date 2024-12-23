@@ -1,9 +1,13 @@
 // lib/screens/home/home_screen.dart
+
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:zenflow/main.dart';
 import '../auth/login_screen.dart';
 import '../tasks/task_detail_screen.dart';
+import '../../services/storage_service.dart';
+import '../../services/quote_service.dart';
+import '../../widgets/custom_drawer.dart';  // Import the custom drawer
 
 // Navigation state management using enum for type safety
 enum NavigationItem {
@@ -21,51 +25,52 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  String _username = '';
+  final StorageService _storageService = StorageService();
+  String _username = 'User'; // Default username
   NavigationItem _selectedItem = NavigationItem.home;
+  List<Map<String, dynamic>> _todaysTasks = [];
   
-  // Sample task data structure with more detailed information
-  final List<Map<String, dynamic>> _todaysTasks = [
-    {
-      'title': 'Project Planning',
-      'deadline': '2:00 PM',
-      'priority': 'High',
-      'progress': 0.7,
-      'description': 'Create project roadmap and milestone definitions',
-      'notes': 'Include feedback from last week\'s team meeting',
-    },
-    {
-      'title': 'Team Meeting',
-      'deadline': '3:30 PM',
-      'priority': 'Medium',
-      'progress': 0.0,
-      'description': 'Weekly sync with development team',
-      'notes': 'Focus on sprint planning and blockers',
-    },
-    {
-      'title': 'Document Review',
-      'deadline': '5:00 PM',
-      'priority': 'Low',
-      'progress': 0.3,
-      'description': 'Review and annotate technical specifications',
-      'notes': 'Pay special attention to API documentation',
-    },
-  ];
-
   @override
   void initState() {
     super.initState();
     _loadUserData();
+    _loadTasks();
   }
 
   Future<void> _loadUserData() async {
-    final prefs = await SharedPreferences.getInstance();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      setState(() {
+        _username = prefs.getString('username') ?? 'User';
+      });
+    } catch (e) {
+      print('Error loading username: $e');
+      // Keep default username if there's an error
+    }
+  }
+
+  Future<void> _loadTasks() async {
+    final tasks = await _storageService.getTasks();
     setState(() {
-      _username = prefs.getString('username') ?? 'User';
+      _todaysTasks = tasks;
     });
   }
 
-  // Helper method to format the greeting based on time of day
+  Future<void> _addTask(Map<String, dynamic> newTask) async {
+    await _storageService.addTask(newTask);
+    await _loadTasks(); // Reload tasks to update UI
+  }
+
+  Future<void> _updateTaskProgress(String taskId, double progress) async {
+    final taskIndex = _todaysTasks.indexWhere((task) => task['id'] == taskId);
+    if (taskIndex != -1) {
+      final updatedTask = Map<String, dynamic>.from(_todaysTasks[taskIndex]);
+      updatedTask['progress'] = progress;
+      await _storageService.updateTask(taskId, updatedTask);
+      await _loadTasks();
+    }
+  }
+
   String _getGreeting() {
     final hour = DateTime.now().hour;
     if (hour < 12) {
@@ -85,6 +90,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       backgroundColor: theme.colorScheme.background,
       appBar: _buildAppBar(theme),
+      drawer: const CustomDrawer(), // Add the custom drawer here
       body: SafeArea(
         child: SingleChildScrollView(
           child: Padding(
@@ -93,7 +99,9 @@ class _HomeScreenState extends State<HomeScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _buildWelcomeSection(theme, textTheme),
-                const SizedBox(height: 32),
+                const SizedBox(height: 24),
+                const _QuoteCard(),
+                const SizedBox(height: 24),
                 _buildProgressSection(theme, textTheme),
                 const SizedBox(height: 32),
                 _buildTasksSection(theme, textTheme),
@@ -111,29 +119,33 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // Build the app bar with notification and settings buttons
   PreferredSizeWidget _buildAppBar(ThemeData theme) {
     return AppBar(
       elevation: 0,
+      leading: Builder(
+        builder: (context) => IconButton(
+          icon: const Icon(Icons.menu),
+          color: Colors.white,
+          onPressed: () => Scaffold.of(context).openDrawer(),
+        ),
+      ),
       title: const Text('ZenFlow'),
       actions: [
         IconButton(
-          icon: const Icon(Icons.notifications_outlined),
+          icon: const Icon(Icons.notifications_outlined,
+          color: Colors.white,
+          ),
           onPressed: () {
             // TODO: Implement notifications panel
-          },
-        ),
-        IconButton(
-          icon: const Icon(Icons.settings_outlined),
-          onPressed: () {
-            // TODO: Navigate to settings screen
           },
         ),
       ],
     );
   }
 
-  // Build the welcome section with user greeting and avatar
+  // Rest of your existing HomeScreen code remains the same...
+  // Include all other methods exactly as they are in your current home_screen.dart
+  
   Widget _buildWelcomeSection(ThemeData theme, TextTheme textTheme) {
     return Container(
       padding: const EdgeInsets.all(20),
@@ -169,7 +181,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // Build the user avatar with first letter of username
   Widget _buildUserAvatar(ThemeData theme) {
     return CircleAvatar(
       radius: 24,
@@ -184,8 +195,12 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // Build the progress overview section
   Widget _buildProgressSection(ThemeData theme, TextTheme textTheme) {
+    // Calculate completion metrics
+    final completedTasks = _todaysTasks.where((task) => task['progress'] == 1.0).length;
+    final completionRate = _todaysTasks.isEmpty ? 0.0 : 
+        (completedTasks / _todaysTasks.length * 100).toStringAsFixed(0);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -197,45 +212,39 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
         const SizedBox(height: 16),
-        _buildProgressCard(theme),
+        Card(
+          elevation: 2,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    _buildProgressMetric('Tasks\nCompleted', '$completedTasks', theme),
+                    _buildVerticalDivider(theme),
+                    _buildProgressMetric('Total\nTasks', '${_todaysTasks.length}', theme),
+                    _buildVerticalDivider(theme),
+                    _buildProgressMetric('Completion\nRate', '$completionRate%', theme),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                LinearProgressIndicator(
+                  value: _todaysTasks.isEmpty ? 0.0 : completedTasks / _todaysTasks.length,
+                  backgroundColor: theme.colorScheme.primary.withOpacity(0.1),
+                  color: theme.colorScheme.secondary,
+                  minHeight: 8,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ],
+            ),
+          ),
+        ),
       ],
     );
   }
 
-  // Build the progress metrics card
-  Widget _buildProgressCard(ThemeData theme) {
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _buildProgressMetric('Tasks\nCompleted', '12', theme),
-                _buildVerticalDivider(theme),
-                _buildProgressMetric('Focus\nTime', '2.5h', theme),
-                _buildVerticalDivider(theme),
-                _buildProgressMetric('Progress\nRate', '85%', theme),
-              ],
-            ),
-            const SizedBox(height: 20),
-            LinearProgressIndicator(
-              value: 0.85,
-              backgroundColor: theme.colorScheme.primary.withOpacity(0.1),
-              color: theme.colorScheme.secondary,
-              minHeight: 8,
-              borderRadius: BorderRadius.circular(4),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // Build individual progress metric
   Widget _buildProgressMetric(String label, String value, ThemeData theme) {
     return Column(
       children: [
@@ -258,7 +267,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // Build the tasks section with header and list
   Widget _buildTasksSection(ThemeData theme, TextTheme textTheme) {
     return Column(
       children: [
@@ -287,17 +295,26 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
         ),
         const SizedBox(height: 16),
-        ListView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: _todaysTasks.length,
-          itemBuilder: (context, index) => _buildTaskCard(_todaysTasks[index], theme),
-        ),
+        _todaysTasks.isEmpty
+            ? Center(
+                child: Text(
+                  'No tasks yet. Add some using the + button!',
+                  style: textTheme.bodyLarge?.copyWith(
+                    color: theme.colorScheme.primary.withOpacity(0.6),
+                  ),
+                ),
+              )
+            : ListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: _todaysTasks.length,
+                itemBuilder: (context, index) =>
+                    _buildTaskCard(_todaysTasks[index], theme),
+              ),
       ],
     );
   }
 
-  // Build individual task card with navigation to detail screen
   Widget _buildTaskCard(Map<String, dynamic> task, ThemeData theme) {
     final priorityColors = {
       'High': theme.colorScheme.error,
@@ -309,13 +326,15 @@ class _HomeScreenState extends State<HomeScreen> {
       margin: const EdgeInsets.only(bottom: 12),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: InkWell(
-        onTap: () {
-          Navigator.push(
+        onTap: () async {
+          await Navigator.push(
             context,
             MaterialPageRoute(
               builder: (context) => TaskDetailScreen(task: task),
             ),
           );
+          // Reload tasks after returning from detail screen
+          _loadTasks();
         },
         borderRadius: BorderRadius.circular(12),
         child: Padding(
@@ -336,7 +355,10 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: priorityColors[task['priority']]?.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(8),
@@ -369,7 +391,14 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // Build bottom navigation bar
+  Widget _buildVerticalDivider(ThemeData theme) {
+    return Container(
+      height: 40,
+      width: 1,
+      color: theme.colorScheme.primary.withOpacity(0.1),
+    );
+  }
+
   Widget _buildBottomNavBar(ThemeData theme) {
     return Container(
       decoration: BoxDecoration(
@@ -419,30 +448,228 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // Build vertical divider for progress metrics
-  Widget _buildVerticalDivider(ThemeData theme) {
-    return Container(
-      height: 40,
-      width: 1,
-      color: theme.colorScheme.primary.withOpacity(0.1),
-    );
-  }
-
-  // Show dialog for adding new task
   void _showAddTaskDialog(BuildContext context) {
-    // TODO: Implement add task dialog
+    final titleController = TextEditingController();
+    final descriptionController = TextEditingController();
+    String selectedPriority = 'Medium';
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Add New Task'),
-        content: Text('Task creation dialog will be implemented here'),
+        title: const Text('Add New Task'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: titleController,
+              decoration: const InputDecoration(labelText: 'Task Title'),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: descriptionController,
+              decoration: const InputDecoration(labelText: 'Description'),
+            ),
+            const SizedBox(height: 16),
+            DropdownButton<String>(
+              value: selectedPriority,
+              isExpanded: true,
+              items: ['Low', 'Medium', 'High'].map((String priority) {
+                return DropdownMenuItem(
+                  value: priority,
+                  child: Text(priority),
+                );
+              }).toList(),
+              onChanged: (String? newValue) {
+                if (newValue != null) {
+                  selectedPriority = newValue;
+                }
+              },
+            ),
+          ],
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text('Close'),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              if (titleController.text.isNotEmpty) {
+                final newTask = {
+                  'id': DateTime.now().millisecondsSinceEpoch.toString(),
+                  'title': titleController.text,
+                  'description': descriptionController.text,
+                  'priority': selectedPriority,
+                  'progress': 0.0,
+                  'deadline': '2:00 PM', // You might want to add a time picker
+                  'subtasks': [], // Initialize empty subtasks list
+                  'notes': '', // Initialize empty notes
+                };
+                await _addTask(newTask);
+                if (!mounted) return;
+                Navigator.pop(context);
+              }
+            },
+            child: const Text('Add'),
           ),
         ],
       ),
+    );
+  }
+}
+
+// Add this widget inside your HomeScreen class
+
+class _QuoteCard extends StatefulWidget {
+  const _QuoteCard({Key? key}) : super(key: key);
+
+  @override
+  _QuoteCardState createState() => _QuoteCardState();
+}
+class _QuoteCardState extends State<_QuoteCard> {
+  Quote? _quote;
+  bool _isLoading = true;
+  String? _error;
+  final double cardHeight = 200.0;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadQuote();
+  }
+
+  Future<void> _loadQuote() async {
+    print('QuoteCard: Starting new quote load');
+    
+    if (_quote == null) {
+      setState(() {
+        _isLoading = true;
+        _error = null;
+      });
+    }
+
+    try {
+      final quote = await QuoteService.getQuoteByTags(['inspirational', 'wisdom']);
+      print('QuoteCard: New quote received: ${quote.content}');
+      
+      if (mounted) {
+        setState(() {
+          _quote = quote;
+          _isLoading = false;
+          _error = null;
+        });
+      }
+    } catch (e) {
+      print('QuoteCard: Error loading quote: $e');
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _error = 'Failed to load quote. Please try again.';
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Container(
+      height: cardHeight,
+      child: Card(
+        elevation: 2,
+        margin: const EdgeInsets.symmetric(horizontal: 16),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 300),
+          child: _buildCardContent(theme),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCardContent(ThemeData theme) {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_error != null) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              _error!,
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: ZenFlowColors.errorBrickRed,
+              ),
+            ),
+            TextButton(
+              onPressed: _loadQuote,
+              child: Text('Retry'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Stack(
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Icon(
+                    Icons.format_quote,
+                    color: ZenFlowColors.secondarySeaBlue,
+                    size: 32,
+                  ),
+                  Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(20),
+                      onTap: _loadQuote,
+                      child: Padding(
+                        padding: const EdgeInsets.all(8.0),
+                        child: Icon(
+                          Icons.refresh,
+                          color: ZenFlowColors.secondarySeaBlue,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              Expanded(
+                child: Center(
+                  child: Text(
+                    _quote?.content ?? '',
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.bodyLarge?.copyWith(
+                      color: ZenFlowColors.primaryDarkTeal,
+                      fontStyle: FontStyle.italic,
+                      height: 1.5,
+                    ),
+                  ),
+                ),
+              ),
+              Text(
+                _quote?.author != null ? '- ${_quote!.author}' : '',
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: ZenFlowColors.primaryDarkTeal.withOpacity(0.7),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
